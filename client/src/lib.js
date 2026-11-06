@@ -1,4 +1,4 @@
-export const MAX_CITIES = 7;
+export const MAX_CITIES = 10;
 
 export const DEFAULT_CITIES = [
   { name: "New York", region: "New York", country: "United States", lat: 40.71, lon: -74.01 },

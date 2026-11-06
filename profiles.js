@@ -30,7 +30,7 @@ const num = (x) => (typeof x === "number" && Number.isFinite(x) ? x : null);
 const str = (x) => String(x ?? "").slice(0, 80);
 
 function sanitize(body) {
-  const cities = (Array.isArray(body?.cities) ? body.cities : []).slice(0, 7)
+  const cities = (Array.isArray(body?.cities) ? body.cities : []).slice(0, 10)
     .map((c) => ({ name: str(c?.name), region: str(c?.region), country: str(c?.country), lat: num(c?.lat), lon: num(c?.lon) }))
     .filter((c) => c.name && c.lat != null && c.lon != null);
   const shown = {};

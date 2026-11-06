@@ -4,6 +4,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { profileApi } from "./profiles.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const mcp = new Client({ name: "kids-weather-web", version: "1.0.0" });
@@ -17,6 +18,7 @@ const call = async (name, args) => {
 };
 
 const app = express();
+app.use(express.json());
 app.use(express.static(path.join(here, "public")));
 const wrap = (fn) => async (req, res) => {
   try { res.json(await fn(req)); } catch (e) { res.status(500).json({ error: String(e.message || e) }); }
@@ -28,6 +30,11 @@ app.get("/api/weather", wrap((req) =>
     lat: Number(req.query.lat), lon: Number(req.query.lon),
     from_date: String(req.query.from), to_date: String(req.query.to),
   })));
+
+app.all("/api/profile", async (req, res) => {
+  const { status, body } = await profileApi(req.method, req.query, req.body);
+  res.status(status).json(body);
+});
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`Open http://localhost:${port}`));

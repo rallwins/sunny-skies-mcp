@@ -145,3 +145,5 @@ table.report{width:100%;border-collapse:separate;border-spacing:0 6px;min-width:
 .user-box{display:flex;align-items:center;gap:8px;background:var(--card);padding:4px 6px 4px 6px;border-radius:999px;box-shadow:var(--shadow)}
 .avatar{width:30px;height:30px;border-radius:50%;background:var(--brand);color:#fff;display:grid;place-items:center;font-weight:600}
 .btn.small{padding:4px 12px;font-size:.85rem}
+.sync{font-size:.8rem;color:var(--muted)}
+@media(max-width:600px){.sync{display:none}}

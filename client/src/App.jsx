@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AQI_LEGEND, DEFAULT_CITIES, MAX_CITIES, METRICS, aqiBand, cityKey, dayLabel, defaultRange,
   explain, iso, loadLS, saveLS, weatherIcon,
@@ -354,16 +354,18 @@ const userKey = (name, what) => `u:${name.trim().toLowerCase()}:${what}`;
 
 function LoginPage({ onLogin }) {
   const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
   const clean = name.trim().replace(/\s+/g, " ").slice(0, 30);
   const known = loadLS("users", []);
+  const go = async (n) => { setBusy(true); await onLogin(n); setBusy(false); };
   function submit(e) {
     e.preventDefault();
-    if (!clean) return;
+    if (!clean || busy) return;
     const key = clean.toLowerCase();
     const users = known.filter((n) => n.toLowerCase() !== key);
     const existing = known.find((n) => n.toLowerCase() === key);
     saveLS("users", [existing || clean, ...users].slice(0, 8));
-    onLogin(existing || clean);
+    go(existing || clean);
   }
   return (
     <main className="login">
@@ -372,11 +374,11 @@ function LoginPage({ onLogin }) {
         <h1>Sunny Skies</h1>
         <p className="hint">What’s your name? We’ll remember your cities for next time.</p>
         <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Type your name" aria-label="Your name" maxLength={30} />
-        <button className="btn primary big" disabled={!clean}>Let’s go! 🚀</button>
+        <button className="btn primary big" disabled={!clean || busy}>{busy ? "Loading…" : "Let’s go! 🚀"}</button>
         {known.length > 0 && (
           <div className="known">
             <span className="hint">Welcome back:</span>
-            {known.map((n) => <button type="button" key={n} className="chip" onClick={() => onLogin(n)}>👋 {n}</button>)}
+            {known.map((n) => <button type="button" key={n} className="chip" disabled={busy} onClick={() => go(n)}>👋 {n}</button>)}
           </div>
         )}
       </form>
@@ -395,13 +397,35 @@ export default function App() {
   const [data, setData] = useState({});
   const rangeOk = Boolean(range.from && range.to && range.from <= range.to);
 
-  useEffect(() => { if (user) saveLS(userKey(user, "cities"), cities); }, [cities, user]);
-  useEffect(() => { if (user) saveLS(userKey(user, "shown"), shown); }, [shown, user]);
+  const [sync, setSync] = useState("idle"); // idle | saving | saved | offline
+  const skipSave = useRef(true);
 
-  function login(name) {
-    // Load this person's saved cities; first-time users start from the defaults (or any pre-login selection).
-    setCities(loadLS(userKey(name, "cities"), loadLS("cities", DEFAULT_CITIES)));
-    setShown(loadLS(userKey(name, "shown"), allOn));
+  // Always keep a local copy; also push to the database (debounced) so it follows the user across devices.
+  useEffect(() => {
+    if (!user) return;
+    saveLS(userKey(user, "cities"), cities);
+    saveLS(userKey(user, "shown"), shown);
+    if (skipSave.current) { skipSave.current = false; return; }
+    setSync("saving");
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetch("/api/profile", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: user, cities, shown }) });
+        setSync(r.ok ? "saved" : "offline");
+      } catch { setSync("offline"); }
+    }, 600);
+    return () => clearTimeout(t);
+  }, [cities, shown, user]);
+
+  async function login(name) {
+    let p = null;
+    try {
+      const r = await fetch(`/api/profile?name=${encodeURIComponent(name)}`);
+      if (r.ok) p = (await r.json()).profile;
+    } catch { /* offline: fall back to this device's copy */ }
+    skipSave.current = Boolean(p); // don't re-save what we just loaded; do save a brand-new profile
+    setCities(p?.cities ?? loadLS(userKey(name, "cities"), loadLS("cities", DEFAULT_CITIES)));
+    setShown(p?.shown ?? loadLS(userKey(name, "shown"), allOn));
+    setSync(p ? "saved" : "idle");
     setUser(name); saveLS("user", name); setPage("weather");
   }
   function logout() { setUser(null); saveLS("user", null); }
@@ -438,6 +462,7 @@ export default function App() {
         <div className="user-box">
           <span className="avatar" aria-hidden>{user[0].toUpperCase()}</span>
           <span>Hi, <b>{user}</b>!</span>
+          <span className="sync" title="Your cities are saved to your account">{sync === "saving" ? "⏳ Saving…" : sync === "saved" ? "☁️ Saved" : sync === "offline" ? "⚠️ Saved on this device only" : ""}</span>
           <button className="btn small" onClick={logout}>Switch user</button>
         </div>
       </header>

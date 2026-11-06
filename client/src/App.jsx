@@ -349,17 +349,62 @@ function CitiesPage({ cities, setCities }) {
   );
 }
 
+/* ---------- login ---------- */
+const userKey = (name, what) => `u:${name.trim().toLowerCase()}:${what}`;
+
+function LoginPage({ onLogin }) {
+  const [name, setName] = useState("");
+  const clean = name.trim().replace(/\s+/g, " ").slice(0, 30);
+  const known = loadLS("users", []);
+  function submit(e) {
+    e.preventDefault();
+    if (!clean) return;
+    const key = clean.toLowerCase();
+    const users = known.filter((n) => n.toLowerCase() !== key);
+    const existing = known.find((n) => n.toLowerCase() === key);
+    saveLS("users", [existing || clean, ...users].slice(0, 8));
+    onLogin(existing || clean);
+  }
+  return (
+    <main className="login">
+      <form className="card login-card" onSubmit={submit}>
+        <div className="login-logo">🌈</div>
+        <h1>Sunny Skies</h1>
+        <p className="hint">What’s your name? We’ll remember your cities for next time.</p>
+        <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Type your name" aria-label="Your name" maxLength={30} />
+        <button className="btn primary big" disabled={!clean}>Let’s go! 🚀</button>
+        {known.length > 0 && (
+          <div className="known">
+            <span className="hint">Welcome back:</span>
+            {known.map((n) => <button type="button" key={n} className="chip" onClick={() => onLogin(n)}>👋 {n}</button>)}
+          </div>
+        )}
+      </form>
+    </main>
+  );
+}
+
 /* ---------- app ---------- */
 export default function App() {
   const [page, setPage] = useState("weather");
-  const [cities, setCities] = useState(() => loadLS("cities", DEFAULT_CITIES));
+  const [user, setUser] = useState(() => loadLS("user", null));
+  const [cities, setCities] = useState(() => (user ? loadLS(userKey(user, "cities"), loadLS("cities", DEFAULT_CITIES)) : DEFAULT_CITIES));
   const [range, setRange] = useState(defaultRange);
-  const [shown, setShown] = useState(() => loadLS("shown", Object.fromEntries(METRICS.map((m) => [m.k, true]))));
+  const allOn = Object.fromEntries(METRICS.map((m) => [m.k, true]));
+  const [shown, setShown] = useState(() => (user ? loadLS(userKey(user, "shown"), allOn) : allOn));
   const [data, setData] = useState({});
   const rangeOk = Boolean(range.from && range.to && range.from <= range.to);
 
-  useEffect(() => saveLS("cities", cities), [cities]);
-  useEffect(() => saveLS("shown", shown), [shown]);
+  useEffect(() => { if (user) saveLS(userKey(user, "cities"), cities); }, [cities, user]);
+  useEffect(() => { if (user) saveLS(userKey(user, "shown"), shown); }, [shown, user]);
+
+  function login(name) {
+    // Load this person's saved cities; first-time users start from the defaults (or any pre-login selection).
+    setCities(loadLS(userKey(name, "cities"), loadLS("cities", DEFAULT_CITIES)));
+    setShown(loadLS(userKey(name, "shown"), allOn));
+    setUser(name); saveLS("user", name); setPage("weather");
+  }
+  function logout() { setUser(null); saveLS("user", null); }
 
   const fetchAll = useCallback(async () => {
     if (!rangeOk) return;
@@ -377,6 +422,8 @@ export default function App() {
   const goCities = () => setPage("cities");
   const tabs = [["weather", "🌤️ Weather"], ["report", "📊 Report"], ["cities", "🏙️ My Cities"]];
 
+  if (!user) return <LoginPage onLogin={login} />;
+
   return (
     <>
       <header className="top no-print">
@@ -388,6 +435,11 @@ export default function App() {
             </button>
           ))}
         </nav>
+        <div className="user-box">
+          <span className="avatar" aria-hidden>{user[0].toUpperCase()}</span>
+          <span>Hi, <b>{user}</b>!</span>
+          <button className="btn small" onClick={logout}>Switch user</button>
+        </div>
       </header>
       <main>
         {page === "weather" && <WeatherPage cities={cities} goCities={goCities} ctl={ctl} data={data} />}

@@ -36,7 +36,7 @@ export function createServer() {
 
   server.tool(
     "get_weather_range",
-    "Daily air quality (US AQI), precipitation, humidity, wind, dew point and UV index for a city between two dates (YYYY-MM-DD, within the last ~90 days up to ~5 days ahead).",
+    "Daily air quality (US AQI, peak hourly value of the day), precipitation, humidity, wind, dew point and UV index for a city between two dates (YYYY-MM-DD, within the last ~90 days up to ~5 days ahead).",
     {
       lat: z.number(), lon: z.number(),
       from_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -65,8 +65,9 @@ export function createServer() {
         // most severe weather code of the afternoon-ish: use the max code of the day
         return {
           date,
-          aqi: d.aqi ? Math.round(avg(d.aqi) ?? NaN) || null : null,
-          aqiMax: d.aqi ? max(d.aqi) : null,
+          // Daily AQI = worst hour of the day, so evening spikes (e.g. Diwali fireworks) aren't averaged away.
+          aqi: d.aqi ? max(d.aqi) : null,
+          aqiAvg: d.aqi ? Math.round(avg(d.aqi) ?? NaN) || null : null,
           precipitation: r1(sum(d.rain || [])),
           humidity: Math.round(avg(d.hum || []) ?? NaN) || null,
           wind: r1(avg(d.wind || [])),

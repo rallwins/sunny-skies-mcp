@@ -147,7 +147,7 @@ const fmt = (v, k) => (v == null ? "–" : k === "aqi" || k === "humidity" ? Mat
 function summarize(days) {
   const col = (k) => days.map((d) => d[k]);
   return {
-    aqi: mean(col("aqi")),
+    aqi: nums(col("aqi")).length ? Math.max(...nums(col("aqi"))) : null,
     precipitation: nums(col("precipitation")).reduce((s, x) => s + x, 0),
     humidity: mean(col("humidity")),
     wind: mean(col("wind")),
@@ -155,7 +155,7 @@ function summarize(days) {
     uv: nums(col("uv")).length ? Math.max(...nums(col("uv"))) : null,
   };
 }
-const SUMMARY_NOTE = { aqi: "avg", precipitation: "total", humidity: "avg", wind: "avg", dewPoint: "avg", uv: "max" };
+const SUMMARY_NOTE = { aqi: "peak", precipitation: "total", humidity: "avg", wind: "avg", dewPoint: "avg", uv: "max" };
 
 function ReportPage({ cities, ctl, data, goCities }) {
   const { shown, range } = ctl;
